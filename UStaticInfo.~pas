@@ -1,0 +1,14 @@
+unit UStaticInfo;
+
+interface
+
+uses
+  UInfo;
+
+var
+  IsValid: boolean;
+  info: TInfo;
+
+implementation
+
+end.

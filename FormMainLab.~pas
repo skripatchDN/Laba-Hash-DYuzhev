@@ -1,0 +1,346 @@
+{
+Задача 4b Хеширование
+Задан набор записей следующей структуры: табельный номер, ФИО, заработная плата.
+По табельному номеру найти остальные сведения.
+
+В папке проекта уже есть файл для тестирования: test.txt
+}
+unit FormMainLab;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, Menus, ActnList, StdActns, ToolWin, ActnMan, ActnCtrls,
+  XPStyleActnCtrls, ImgList, ExtCtrls, StdCtrls, ComCtrls, UInfo, UHashTable,
+  Grids;
+
+type
+  TFormMain = class(TForm)
+    MainMenu: TMainMenu;
+    mi_file: TMenuItem;
+    mi_edit: TMenuItem;
+    mi_search: TMenuItem;
+    mi_task: TMenuItem;
+    mi_new: TMenuItem;
+    mi_open: TMenuItem;
+    mi_save: TMenuItem;
+    mi_saveas: TMenuItem;
+    mi_close: TMenuItem;
+    mi_exit: TMenuItem;
+    mi_add: TMenuItem;
+    mi_delete: TMenuItem;
+    mi_clear: TMenuItem;
+    ActionList: TActionList;
+    act_new: TAction;
+    act_open: TAction;
+    act_save: TAction;
+    act_saveAs: TAction;
+    act_close: TAction;
+    act_exit: TAction;
+    act_add: TAction;
+    act_delete: TAction;
+    act_clear: TAction;
+    act_search: TAction;
+    act_task: TAction;
+    ImageList: TImageList;
+    ActionManager: TActionManager;
+    ActionToolBar: TActionToolBar;
+    mi_separator2: TMenuItem;
+    mi_separator1: TMenuItem;
+    OpenDialog: TOpenDialog;
+    SaveDialog: TSaveDialog;
+    StringGrid: TStringGrid;
+    act_addRandom: TAction;
+    N1: TMenuItem;
+
+    function TrySaveAndContinue: boolean;
+    procedure FormCreate(Sender: TObject);
+    procedure act_exitExecute(Sender: TObject);
+    procedure act_openExecute(Sender: TObject);
+    procedure act_saveExecute(Sender: TObject);
+    procedure act_saveAsExecute(Sender: TObject);
+    procedure act_newExecute(Sender: TObject);
+    procedure act_closeExecute(Sender: TObject);
+    procedure act_addExecute(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure act_clearExecute(Sender: TObject);
+    procedure act_searchExecute(Sender: TObject);
+    procedure act_deleteExecute(Sender: TObject);
+    procedure act_taskExecute(Sender: TObject);
+    procedure act_addRandomExecute(Sender: TObject);
+
+  protected
+    procedure SetIsSaved(value: boolean);
+    procedure SetIsFileOpen(value: boolean);
+
+  private
+    FIsSaved: boolean;
+    FIsFileOpen: boolean;
+    FFileName: string;
+    FTable: THashTable;
+
+  public
+    property IsSaved: boolean read FIsSaved write SetIsSaved;
+    property IsFileOpen: boolean read FIsFileOpen write SetIsFileOpen;
+  end;
+
+
+const
+  DEFAULT_FILENAME = 'Безымянный.txt';
+
+var
+  FormMain: TFormMain;
+
+implementation
+
+{$R *.dfm}
+
+// Сеттер для состояния IsSaved
+procedure TFormMain.SetIsSaved(value: boolean);
+begin
+  FIsSaved := value;
+  act_save.Enabled := not value;
+end;
+
+// Сеттер для состояния IsFileOpen, устанавливает необходимые флаги
+procedure TFormMain.SetIsFileOpen(value: boolean);
+begin
+  FIsFileOpen := value;
+  act_save.Enabled := value;
+  act_saveAs.Enabled := value;
+  act_close.Enabled := value;
+  act_add.Enabled := value;
+  act_delete.Enabled := value;
+  act_clear.Enabled := value;
+  act_search.Enabled := value;
+  act_task.Enabled := value;
+end;
+
+{
+Проверяет, сохранен ли файл, чтобы продолжить действие (открыть новый файл,
+закрыть программу и т.д.). Если файл не сохранен и пользователь нажал крестик
+или отмену, то FALSE. Если файл уже сохранен/пользователь не захотел сохранять/
+файл сохранился, то TRUE
+}
+function TFormMain.TrySaveAndContinue: boolean;
+var
+  responce: integer;
+begin
+  if IsSaved then
+    Result := true
+  else
+    begin
+      Result := false;
+      responce := MessageDlg('Вы хотите сохранить изменения?',
+                              mtConfirmation,
+                              mbYesNoCancel,
+                              0);
+      case responce of
+        mrNo:
+          Result := true;
+        mrYes:
+          if SaveDialog.Execute then
+            begin
+              FFileName := SaveDialog.FileName;
+              FTable.SaveToFile(FFileName);
+              Result := true;
+            end
+      end;
+    end;
+end;
+
+// Инициализация формы
+procedure TFormMain.FormCreate(Sender: TObject);
+begin
+  IsFileOpen := false;
+  IsSaved := true;
+  FFileName := DEFAULT_FILENAME;
+  FTable := THashTable.Create;
+end;
+
+// Выход из программы
+procedure TFormMain.act_exitExecute(Sender: TObject);
+begin
+  Close;
+end;
+
+// Открыть файл
+procedure TFormMain.act_openExecute(Sender: TObject);
+begin
+  if TrySaveAndContinue and OpenDialog.Execute then
+    begin
+      FFileName := OpenDialog.FileName;
+      FTable.LoadFromFile(FFileName);
+      FTable.View(StringGrid);
+      IsFileOpen := true;
+      IsSaved := true;
+    end;
+
+end;
+
+// Сохранить
+procedure TFormMain.act_saveExecute(Sender: TObject);
+begin
+  FTable.SaveToFile(FFileName);
+  IsSaved := true;
+end;
+
+// Сохранить как...
+procedure TFormMain.act_saveAsExecute(Sender: TObject);
+begin
+  if SaveDialog.Execute then
+    begin
+      FFileName := SaveDialog.FileName;
+      FTable.SaveToFile(FFileName);
+      IsSaved := true;
+    end;
+end;
+
+// Создать новый файл
+procedure TFormMain.act_newExecute(Sender: TObject);
+begin
+  if TrySaveAndContinue then
+    begin
+      FFileName := DEFAULT_FILENAME;
+      FTable.Clear;
+      FTable.View(StringGrid);
+      IsFileOpen := true;
+      IsSaved := true;
+    end;
+end;
+
+// Закрыть файл
+procedure TFormMain.act_closeExecute(Sender: TObject);
+begin
+  if TrySaveAndContinue then
+    begin
+      FFileName := DEFAULT_FILENAME;
+      FTable.Clear;
+      FTable.View(StringGrid);
+      IsFileOpen := false;
+      IsSaved := true;
+    end;
+end;
+
+// Добавление записи в хеш-таблицу
+procedure TFormMain.act_addExecute(Sender: TObject);
+var
+  tmp: string;
+  info: TInfo;
+  isCorrect: boolean;
+begin
+  tmp := InputBox('Добавить запись',
+                'Введите табельный номер', '');
+  isCorrect := TryStrToInt(tmp, info.key) and (info.key >= 0);
+  if isCorrect then
+    begin
+      info.name := InputBox('Добавить запись',
+                'Введите ФИО', '');
+      isCorrect := (info.name <> '');
+      if isCorrect then
+        begin
+          tmp := InputBox('Добавить запись',
+                'Введите заработную плату', '');
+          isCorrect := (tmp <> '') and
+          TryStrToInt(tmp, info.salary) and
+          (info.salary >= 0);
+        end;
+    end;
+  if not isCorrect then
+    ShowMessage('Введено некорректное значение')
+  else
+    begin
+      if not FTable.Add(info) then
+        ShowMessage('Запись не добавлена')
+      else
+        begin
+          FTable.View(StringGrid);
+          IsSaved := false;
+        end;
+    end;
+end;
+
+// При закрытии формы
+procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  if TrySaveAndContinue then
+    begin
+      FTable.Clear;
+    end
+  else
+    Action := caNone
+end;
+
+// Очистить таблицы
+procedure TFormMain.act_clearExecute(Sender: TObject);
+var
+  responce: integer;
+begin
+  responce := MessageDlg('Очистить таблицы?',
+                              mtConfirmation,
+                              mbYesNoCancel,
+                              0);
+  if responce = mrYes then
+    begin
+      FTable.Clear;
+      FTable.View(StringGrid);
+      IsSaved := false;
+    end;
+end;
+
+// Поиск слова
+procedure TFormMain.act_searchExecute(Sender: TObject);
+var
+  key: TKey;
+  info: TInfo;
+begin
+  key := StrToInt(InputBox('Поиск записи',
+                            'Введите табельный номер', ''));
+  if not FTable.Find(key, info) then
+    ShowMessage('Запись не найдена')
+  else
+    ShowMessage('Табельный номер: ' + IntToStr(info.key) + #13#10 +
+                'ФИО: ' + info.name + #13#10 +
+                'Заработная плата: ' + IntToStr(info.salary));
+
+end;
+
+// Удаление слова
+procedure TFormMain.act_deleteExecute(Sender: TObject);
+var
+  key: integer;
+begin
+  key := StrToInt(InputBox('Удаление записи',
+                  'Введите табельный номер записи, которую хотите удалить', ''));
+  if FTable.Delete(key) then
+    begin
+      FTable.View(StringGrid);
+      IsSaved := false;
+      ShowMessage('Запись удалена');
+    end
+  else
+    ShowMessage('Запись не найдена')
+end;
+
+// Основная задача
+procedure TFormMain.act_taskExecute(Sender: TObject);
+begin
+  act_searchExecute(Sender);
+end;
+
+
+procedure TFormMain.act_addRandomExecute(Sender: TObject);
+var
+  n: integer;
+begin
+  n := StrToInt(InputBox('Добавить случайные записи',
+                  'Введите количество записей, которые хотите добавить', ''));
+  if n > 0 then
+    begin
+      FTable.AddRandom(n);
+      FTable.View(StringGrid);
+    end;
+end;
+
+end.
